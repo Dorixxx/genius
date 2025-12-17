@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from './components/Card';
-import { Tooltip } from './components/Tooltip';
 import { ElementDefinition, GameElement, LogEntry } from './types';
 import { combineElements } from './services/geminiService';
-import { Trash2, RotateCcw, Sparkles, Atom, X, Menu, Box, Cpu, Zap } from 'lucide-react';
+import { Trash2, RotateCcw, Atom, X, Box, Sparkles } from 'lucide-react';
 
 // Initial Game State (Translated)
 const INITIAL_ELEMENTS: ElementDefinition[] = [
@@ -15,10 +14,9 @@ const App: React.FC = () => {
   // --- State ---
   const [library, setLibrary] = useState<ElementDefinition[]>(INITIAL_ELEMENTS);
   const [boardElements, setBoardElements] = useState<GameElement[]>([]);
-  const [logs, setLogs] = useState<LogEntry[]>([{ id: 'init', text: "系统已初始化。熵值临界。等待指令。", timestamp: Date.now(), type: 'info' }]);
+  const [logs, setLogs] = useState<LogEntry[]>([{ id: 'init', text: "系统已初始化。准备合成。", timestamp: Date.now(), type: 'info' }]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(true);
-  const [useAI, setUseAI] = useState(false); // Default to OFF (Manual Mode)
   const [draggedItem, setDraggedItem] = useState<{ source: 'library' | 'board', id: string, data: ElementDefinition } | null>(null);
 
   // --- Refs for Drag & Drop ---
@@ -71,10 +69,10 @@ const App: React.FC = () => {
     if (draggedItem?.source === 'board' && draggedItem.id === targetId) return;
 
     setIsProcessing(true);
-    addLog(`正在尝试合成 (${useAI ? 'AI' : '手动'}): ${droppedData.name} + ${targetElement.name}...`, 'info');
+    addLog(`正在尝试合成: ${droppedData.name} + ${targetElement.name}...`, 'info');
     
-    // Pass the useAI flag to the service
-    const result = await combineElements(droppedData, targetElement, useAI);
+    // Call the stripped-down service
+    const result = await combineElements(droppedData, targetElement);
 
     if (result.success && result.element) {
       addLog(result.flavorText || `合成完成: 创造了 ${result.element.name}`, 'success');
@@ -169,11 +167,6 @@ const App: React.FC = () => {
     }
   };
 
-  const toggleAI = () => {
-      setUseAI(!useAI);
-      addLog(!useAI ? "AI 协议已激活。无限合成可能开启。" : "AI 协议已离线。切换至标准手动模式。", 'info');
-  }
-
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-200 overflow-hidden font-sans flex flex-col relative selection:bg-cyan-500/30">
       
@@ -189,25 +182,10 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <Atom className="w-6 h-6 text-cyan-400 animate-pulse" />
             <h1 className="font-bold text-lg tracking-wider text-cyan-100 hidden md:block">创世协议</h1>
+            <span className="text-xs px-2 py-0.5 rounded bg-cyan-900/30 border border-cyan-500/30 text-cyan-300 font-mono">LITE</span>
           </div>
           
           <div className="flex justify-end gap-2 items-center">
-            
-            {/* AI Toggle Button */}
-            <button 
-                onClick={toggleAI}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded border text-xs transition-all mr-2
-                    ${useAI 
-                        ? 'bg-purple-900/30 border-purple-500 text-purple-200 shadow-[0_0_10px_rgba(168,85,247,0.3)]' 
-                        : 'bg-slate-800/50 border-slate-600 text-slate-400'
-                    }
-                `}
-                title={useAI ? "点击关闭 AI 模式" : "点击开启 AI 模式"}
-            >
-                {useAI ? <Sparkles size={14} className="animate-spin-slow" /> : <Cpu size={14} />}
-                <span className="font-mono font-bold">{useAI ? "AI: ON" : "AI: OFF"}</span>
-            </button>
-
             <button 
                 onClick={clearBoard}
                 className="flex items-center gap-2 px-3 py-1.5 rounded bg-slate-800/50 border border-slate-700 hover:bg-red-900/20 hover:border-red-500/50 text-xs transition-colors"
@@ -245,7 +223,7 @@ const App: React.FC = () => {
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-600 pointer-events-none">
                     <Sparkles className="w-12 h-12 mb-4 opacity-20" />
                     <p className="text-sm tracking-widest uppercase opacity-50">从下方拖拽物质开始创造</p>
-                    <p className="text-xs opacity-30 mt-2 font-mono">{useAI ? "AI 协议已连接" : "标准物理法则生效中"}</p>
+                    <p className="text-xs opacity-30 mt-2 font-mono">标准物理法则生效中</p>
                 </div>
              )}
 
