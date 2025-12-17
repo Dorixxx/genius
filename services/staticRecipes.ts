@@ -22,7 +22,7 @@ const RAW_RECIPES: RecipeDefinition[] = [
   { inputs: ["物质", "物质"], result: { id: "gravity", name: "引力", emoji: "🧲", description: "物质之间的相互吸引。", type: "cosmic" } },
   { inputs: ["等离子体", "引力"], result: { id: "star", name: "恒星", emoji: "☀️", description: "照亮宇宙的核聚变炉。", type: "cosmic" } },
   { inputs: ["物质", "引力"], result: { id: "planet", name: "行星", emoji: "🪐", description: "围绕恒星运行的天体。", type: "cosmic" } },
-  { inputs: ["恒星", "行星"], result: { id: "solar_system", name: "星系", emoji: "🌌", description: "天体的舞蹈。", type: "cosmic" } },
+  { inputs: ["恒星", "行星"], result: { id: "time", name: "时间", emoji: "🕙", description: "规则的执行者。", type: "cosmic" } },
   { inputs: ["物质", "时间"], result: { id: "entropy", name: "熵", emoji: "⌛", description: "无序度的增加。", type: "abstract" } },
   { inputs: ["恒星", "时间"], result: { id: "black_hole", name: "黑洞", emoji: "🕳️", description: "光也无法逃脱的深渊。", type: "cosmic" } },
 
