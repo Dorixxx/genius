@@ -1,13 +1,17 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from './components/Card';
+import { Sidebar } from './components/Sidebar';
+import { EraAnnouncement } from './components/EraAnnouncement';
 import { ElementDefinition, GameElement, LogEntry } from './types';
 import { combineElements } from './services/geminiService';
-import { Trash2, RotateCcw, Atom, X, Box, Sparkles } from 'lucide-react';
+import { getEraForElement, ERAS } from './services/staticRecipes';
+import { Trash2, RotateCcw, Atom, Menu, Sparkles } from 'lucide-react';
 
 // Initial Game State (Translated)
 const INITIAL_ELEMENTS: ElementDefinition[] = [
-  { id: 'spark', name: '火花', emoji: '✨', description: '虚空中残留的一丝微弱能量。', type: 'primordial', discoveredAt: Date.now() },
-  { id: 'void', name: '虚空', emoji: '⚫', description: '无尽的虚无。', type: 'primordial', discoveredAt: Date.now() }
+  { id: 'spark', name: '火花', emoji: '✨', description: '虚空中残留的一丝微弱能量。', type: 'primordial', era: ERAS.GENESIS, discoveredAt: Date.now() },
+  { id: 'void', name: '虚空', emoji: '⚫', description: '无尽的虚无。', type: 'primordial', era: ERAS.GENESIS, discoveredAt: Date.now() }
 ];
 
 const App: React.FC = () => {
@@ -16,8 +20,12 @@ const App: React.FC = () => {
   const [boardElements, setBoardElements] = useState<GameElement[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([{ id: 'init', text: "系统已初始化。准备合成。", timestamp: Date.now(), type: 'info' }]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [draggedItem, setDraggedItem] = useState<{ source: 'library' | 'board', id: string, data: ElementDefinition } | null>(null);
+  
+  // Era State
+  const [unlockedEras, setUnlockedEras] = useState<string[]>([ERAS.GENESIS]);
+  const [newEraAnimation, setNewEraAnimation] = useState<string | null>(null);
 
   // --- Refs for Drag & Drop ---
   const boardRef = useRef<HTMLDivElement>(null);
@@ -27,7 +35,17 @@ const App: React.FC = () => {
     // Load Library
     const savedLib = localStorage.getItem('genesis_library');
     if (savedLib) {
-      setLibrary(JSON.parse(savedLib));
+      const parsedLib: ElementDefinition[] = JSON.parse(savedLib);
+      // Hydrate Eras for old saves
+      const hydratedLib = parsedLib.map(el => ({
+        ...el,
+        era: el.era || getEraForElement(el.name)
+      }));
+      setLibrary(hydratedLib);
+      
+      // Calculate unlocked eras from library
+      const eras = Array.from(new Set(hydratedLib.map(el => el.era || ERAS.GENESIS)));
+      setUnlockedEras(eras);
     }
 
     // Load Board State
@@ -86,6 +104,14 @@ const App: React.FC = () => {
       // Add to library if new
       setLibrary(prev => {
         if (prev.some(e => e.name === newDef.name)) return prev; // Check by name to avoid dupes with generated IDs
+        
+        // --- NEW ERA CHECK ---
+        const era = newDef.era || ERAS.GENESIS;
+        if (!unlockedEras.includes(era)) {
+            setUnlockedEras(prevEras => [...prevEras, era]);
+            setNewEraAnimation(era); // Trigger Animation
+        }
+        
         return [...prev, newDef];
       });
 
@@ -161,6 +187,7 @@ const App: React.FC = () => {
     if (confirm("重置宇宙回到初始状态？所有进度将丢失。")) {
       setLibrary(INITIAL_ELEMENTS);
       setBoardElements([]);
+      setUnlockedEras([ERAS.GENESIS]);
       setLogs([{ id: 'reset', text: "宇宙已重置。", timestamp: Date.now(), type: 'info' }]);
       localStorage.removeItem('genesis_library');
       localStorage.removeItem('genesis_board');
@@ -170,6 +197,14 @@ const App: React.FC = () => {
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-200 overflow-hidden font-sans flex flex-col relative selection:bg-cyan-500/30">
       
+      {/* Era Announcement Overlay */}
+      {newEraAnimation && (
+        <EraAnnouncement 
+            eraName={newEraAnimation} 
+            onComplete={() => setNewEraAnimation(null)} 
+        />
+      )}
+
       {/* Background Ambience */}
       <div className="absolute inset-0 z-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-black to-black opacity-80" />
       <div className="absolute inset-0 z-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
@@ -201,101 +236,83 @@ const App: React.FC = () => {
                 <RotateCcw size={14} /> <span className="hidden sm:inline">重置</span>
             </button>
             <button
-               onClick={() => setLibraryOpen(!libraryOpen)}
-               className={`flex items-center gap-2 px-3 py-1.5 rounded border text-xs transition-colors md:hidden
-                  ${libraryOpen ? 'bg-cyan-900/50 border-cyan-500' : 'bg-slate-800/50 border-slate-700'}
+               onClick={() => setSidebarOpen(!sidebarOpen)}
+               className={`flex items-center gap-2 px-3 py-1.5 rounded border text-xs transition-colors z-50
+                  ${sidebarOpen ? 'bg-cyan-900/50 border-cyan-500' : 'bg-slate-800/50 border-slate-700'}
                `}
             >
-                {libraryOpen ? <X size={14}/> : <Box size={14}/>}
+                <Menu size={14}/>
             </button>
           </div>
         </div>
 
-        {/* Game Board */}
-        <div 
-            ref={boardRef}
-            onDrop={handleDropOnBoard}
-            onDragOver={handleDragOver}
-            className="flex-1 relative overflow-hidden bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900/50 to-transparent"
-        >
-             {/* Center Hint if empty */}
-             {boardElements.length === 0 && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-600 pointer-events-none">
-                    <Sparkles className="w-12 h-12 mb-4 opacity-20" />
-                    <p className="text-sm tracking-widest uppercase opacity-50">从下方拖拽物质开始创造</p>
-                    <p className="text-xs opacity-30 mt-2 font-mono">标准物理法则生效中</p>
-                </div>
-             )}
-
-            {/* Elements */}
-            {boardElements.map(el => (
-                <div
-                    key={el.id}
-                    className="absolute z-20"
-                    style={{ left: el.x, top: el.y }}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, 'board', el, el.id)}
-                    onDrop={(e) => handleDropOnCard(e, el.id)}
-                    onDragOver={handleDragOver}
-                >
-                    <Card data={el} />
-                </div>
-            ))}
-
-            {/* Loading Overlay */}
-            {isProcessing && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-black/60 rounded-full backdrop-blur border border-cyan-500/30">
-                    <div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-cyan-400 font-mono text-xs animate-pulse">正在合成...</p>
-                </div>
-            )}
-        </div>
-
-        {/* Bottom Library Dock */}
-        <div className={`
-            absolute bottom-0 left-0 right-0 z-40
-            transition-transform duration-300 ease-in-out
-            ${libraryOpen ? 'translate-y-0' : 'translate-y-full'}
-        `}>
-             {/* Handle to pull up if hidden (optional, but using button mainly) */}
-             
-            <div className="bg-slate-900/90 backdrop-blur-xl border-t border-slate-700 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
-                 <div className="flex justify-between items-center px-4 py-2 border-b border-white/5">
-                    <span className="text-xs text-slate-400 font-mono uppercase">物质库 ({library.length})</span>
-                    <button onClick={() => setLibraryOpen(false)} className="md:hidden opacity-50"><X size={16}/></button>
-                 </div>
-                 
-                 <div className="h-48 overflow-x-auto overflow-y-hidden custom-scrollbar p-4">
-                    <div className="flex gap-4 min-w-max items-center h-full">
-                        {library.map(item => (
-                        <div 
-                            key={item.id} 
-                            draggable 
-                            onDragStart={(e) => handleDragStart(e, 'library', item)}
-                            className="cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform"
-                        >
-                            <Card data={item} className="scale-90" />
-                        </div>
-                        ))}
+        {/* Layout: Board + Sidebar */}
+        <div className="flex-1 flex relative overflow-hidden">
+            
+            {/* Game Board */}
+            <div 
+                ref={boardRef}
+                onDrop={handleDropOnBoard}
+                onDragOver={handleDragOver}
+                className="flex-1 relative overflow-hidden bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900/50 to-transparent transition-all duration-300"
+                style={{ marginRight: sidebarOpen ? '16rem' : '0' }} // Push content when sidebar is open
+            >
+                {/* Center Hint if empty */}
+                {boardElements.length === 0 && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-600 pointer-events-none">
+                        <Sparkles className="w-12 h-12 mb-4 opacity-20" />
+                        <p className="text-sm tracking-widest uppercase opacity-50">从右侧物质库拖拽开始</p>
+                        <p className="text-xs opacity-30 mt-2 font-mono">标准物理法则生效中</p>
                     </div>
-                 </div>
-            </div>
-        </div>
+                )}
 
-        {/* Log Console (Floating) */}
-        <div className="absolute bottom-52 left-4 w-64 md:w-96 max-h-32 pointer-events-none z-30">
-             <div className="flex flex-col-reverse gap-1 mask-image-gradient">
-                {logs.slice(0, 4).map((log) => (
-                    <div key={log.id} className={`px-2 py-1 rounded bg-black/60 backdrop-blur-sm border-l-2 text-xs font-mono shadow-lg transition-all animate-in fade-in slide-in-from-left-2 ${
-                        log.type === 'success' ? 'border-emerald-500 text-emerald-100' : 
-                        log.type === 'failure' ? 'border-red-500 text-red-100' : 'border-slate-500 text-slate-300'
-                    }`}>
-                        {log.text}
+                {/* Elements */}
+                {boardElements.map(el => (
+                    <div
+                        key={el.id}
+                        className="absolute z-20"
+                        style={{ left: el.x, top: el.y }}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, 'board', el, el.id)}
+                        onDrop={(e) => handleDropOnCard(e, el.id)}
+                        onDragOver={handleDragOver}
+                    >
+                        <Card data={el} />
                     </div>
                 ))}
-             </div>
-        </div>
 
+                {/* Loading Overlay */}
+                {isProcessing && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-black/60 rounded-full backdrop-blur border border-cyan-500/30">
+                        <div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-cyan-400 font-mono text-xs animate-pulse">正在合成...</p>
+                    </div>
+                )}
+                
+                {/* Log Console (Bottom Left) */}
+                <div className="absolute bottom-4 left-4 w-64 md:w-96 max-h-32 pointer-events-none z-30">
+                    <div className="flex flex-col-reverse gap-1 mask-image-gradient">
+                        {logs.slice(0, 4).map((log) => (
+                            <div key={log.id} className={`px-2 py-1 rounded bg-black/60 backdrop-blur-sm border-l-2 text-xs font-mono shadow-lg transition-all animate-in fade-in slide-in-from-left-2 ${
+                                log.type === 'success' ? 'border-emerald-500 text-emerald-100' : 
+                                log.type === 'failure' ? 'border-red-500 text-red-100' : 'border-slate-500 text-slate-300'
+                            }`}>
+                                {log.text}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Sidebar (Right) */}
+            <Sidebar 
+                library={library} 
+                onDragStart={handleDragStart} 
+                isOpen={sidebarOpen}
+                setIsOpen={setSidebarOpen}
+            />
+            
+        </div>
       </div>
     </div>
   );

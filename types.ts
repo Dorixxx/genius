@@ -1,3 +1,4 @@
+
 export type ElementType = 'primordial' | 'matter' | 'energy' | 'life' | 'technology' | 'abstract' | 'cosmic';
 
 export interface GameElement {
@@ -7,6 +8,7 @@ export interface GameElement {
   emoji: string;
   description: string;
   type: ElementType;
+  era?: string; // The time period this element belongs to
   x: number;
   y: number;
   discoveredAt: number;
@@ -18,6 +20,7 @@ export interface ElementDefinition {
   emoji: string;
   description: string;
   type: ElementType;
+  era?: string; // The time period this element belongs to
   discoveredAt: number; // Timestamp
 }
 
